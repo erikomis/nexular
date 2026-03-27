@@ -4,8 +4,11 @@ import { I18nService } from "./mcp/i18n";
 import { MCPService } from "./mcp/service";
 import { AuthService, createAuthServiceWithDefaults } from "./auth/strategies";
 import { applyAuthPlugins } from "../../server/auth-plugin-loader";
+import type { ProviderClass } from "./di/container";
 
-export function bootstrap(AppModule: any): void {
+type ModuleConstructor = abstract new (...args: unknown[]) => object;
+
+export function bootstrap(AppModule: ModuleConstructor): void {
   const moduleMetadata = getModuleMetadata(AppModule);
 
   if (!container.has(I18nService)) {
@@ -28,14 +31,16 @@ export function bootstrap(AppModule: any): void {
 
   applyAuthPlugins(container.resolve<AuthService>(AuthService));
 
-  moduleMetadata?.providers?.forEach((ProviderClass) => {
-    if (!container.has(ProviderClass)) {
-      container.registerClass(ProviderClass, {
-        useClass: ProviderClass,
-        scope: getInjectableScope(ProviderClass),
+  moduleMetadata?.providers?.forEach((providerClass) => {
+    const classProvider = providerClass as ProviderClass;
+
+    if (!container.has(classProvider)) {
+      container.registerClass(classProvider, {
+        useClass: classProvider,
+        scope: getInjectableScope(classProvider),
       });
     }
   });
 
-  console.log("Nexular app iniciado com sucesso.");
+  process.stdout.write("Nexular app iniciado com sucesso.\n");
 }

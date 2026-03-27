@@ -1,26 +1,31 @@
 export type ProviderScope = "singleton" | "transient";
 
-export type ProviderClass<T = any> = new (...args: any[]) => T;
-type InjectableClass<T = any> = ProviderClass<T> & { inject?: any[] };
+type ClassToken<T = unknown> = abstract new (...args: never[]) => T;
+type ClassConstructor<T = unknown> = new (...args: never[]) => T;
 
-export type ClassProvider<T = any> = {
+export type InjectionToken<T = unknown> = ClassToken<T> | symbol | string;
+
+export type ProviderClass<T = unknown> = ClassConstructor<T>;
+type InjectableClass<T = unknown> = ProviderClass<T> & { inject?: InjectionToken[] };
+
+export type ClassProvider<T = unknown> = {
   useClass: InjectableClass<T>;
   scope?: ProviderScope;
-  deps?: any[];
+  deps?: InjectionToken[];
 };
 
 type ProviderRecord = {
-  factory: () => any;
+  factory: () => unknown;
   scope: ProviderScope;
-  instance?: any;
+  instance?: unknown;
 };
 
 export class Container {
-  private readonly providers = new Map<any, ProviderRecord>();
+  private readonly providers = new Map<InjectionToken, ProviderRecord>();
 
   constructor(private readonly parent?: Container) {}
 
-  register<T>(token: any, instance: T): void {
+  register<T>(token: InjectionToken<T>, instance: T): void {
     this.providers.set(token, {
       scope: "singleton",
       instance,
@@ -28,31 +33,27 @@ export class Container {
     });
   }
 
-  registerClass<T>(token: any, provider: ClassProvider<T>): void {
+  registerClass<T>(token: InjectionToken<T>, provider: ClassProvider<T>): void {
     const scope = provider.scope ?? "singleton";
     const deps = provider.deps ?? provider.useClass.inject ?? [];
 
     this.providers.set(token, {
       scope,
       factory: () => {
-        const resolvedDeps = deps.map((depToken: any) => this.resolve(depToken));
-        return new provider.useClass(...resolvedDeps);
+        const resolvedDeps = deps.map((depToken) => this.resolve(depToken));
+        return new provider.useClass(...(resolvedDeps as never[]));
       },
     });
   }
 
-  resolve<T>(token: any): T {
+  resolve<T>(token: InjectionToken<T>): T {
     let provider = this.providers.get(token);
 
     // Support mixed runtime copies (e.g. framework src + app using framework dist)
     // by matching class/function tokens by name as a fallback.
-    if (!provider && token && typeof token === "function" && token.name) {
+    if (!provider && isClassToken(token) && token.name) {
       for (const [registeredToken, registeredProvider] of this.providers.entries()) {
-        if (
-          registeredToken &&
-          typeof registeredToken === "function" &&
-          registeredToken.name === token.name
-        ) {
+        if (isClassToken(registeredToken) && registeredToken.name === token.name) {
           provider = registeredProvider;
           break;
         }
@@ -76,7 +77,7 @@ export class Container {
     return provider.factory() as T;
   }
 
-  has(token: any): boolean {
+  has(token: InjectionToken): boolean {
     return this.providers.has(token) || Boolean(this.parent?.has(token));
   }
 
@@ -98,8 +99,23 @@ export function Injectable(options?: { scope?: ProviderScope }) {
   };
 }
 
-export function getInjectableScope(target: any): ProviderScope {
-  return target?.__injectable?.scope ?? "singleton";
+type InjectableMetadataCarrier = {
+  __injectable?: {
+    scope?: ProviderScope;
+  };
+};
+
+function isClassToken(token: InjectionToken): token is ProviderClass {
+  return typeof token === "function";
+}
+
+export function getInjectableScope(target: unknown): ProviderScope {
+  if (typeof target !== "object" && typeof target !== "function") {
+    return "singleton";
+  }
+
+  const carrier = target as InjectableMetadataCarrier;
+  return carrier.__injectable?.scope ?? "singleton";
 }
 
 export const container = new Container();

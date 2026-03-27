@@ -1,3 +1,5 @@
+type RequireLike = (moduleId: string) => unknown;
+
 export type ComponentMetadata = {
   selector: string;
   template: string;
@@ -24,13 +26,17 @@ type NodeModules = {
 };
 
 function loadNodeModules(): NodeModules | null {
-  if (typeof require !== "function") {
+  const globalRequire = (globalThis as { require?: RequireLike }).require;
+  const requireLike: RequireLike | undefined =
+    typeof require === "function" ? (require as RequireLike) : globalRequire;
+
+  if (typeof requireLike !== "function") {
     return null;
   }
 
   try {
-    const fs = require("fs") as NodeModules["fs"];
-    const nodePath = require("path") as NodeModules["path"];
+    const fs = requireLike("fs") as NodeModules["fs"];
+    const nodePath = requireLike("path") as NodeModules["path"];
     return { fs, path: nodePath };
   } catch {
     return null;
@@ -115,7 +121,7 @@ function normalizeComponentMetadata(config: ComponentConfig): ComponentMetadata 
 
 export function Component(config: ComponentConfig) {
   const metadata = normalizeComponentMetadata(config);
-  return function <T extends new (...args: any[]) => any>(target: T): void {
+  return function <T extends abstract new (...args: unknown[]) => unknown>(target: T): void {
     Object.defineProperty(target, "__metadata", {
       value: metadata,
       configurable: false,
@@ -125,6 +131,26 @@ export function Component(config: ComponentConfig) {
   };
 }
 
-export function getComponentMetadata(target: any): ComponentMetadata | undefined {
-  return target?.constructor?.__metadata ?? target?.__metadata;
+type MetadataCarrier = {
+  __metadata?: ComponentMetadata;
+  constructor?: {
+    __metadata?: ComponentMetadata;
+  };
+};
+
+function asMetadataCarrier(value: unknown): MetadataCarrier | null {
+  if ((typeof value === "object" && value !== null) || typeof value === "function") {
+    return value as MetadataCarrier;
+  }
+
+  return null;
+}
+
+export function getComponentMetadata(target: unknown): ComponentMetadata | undefined {
+  const carrier = asMetadataCarrier(target);
+  if (!carrier) {
+    return undefined;
+  }
+
+  return carrier.constructor?.__metadata ?? carrier.__metadata;
 }
