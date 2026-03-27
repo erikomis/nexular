@@ -35,16 +35,29 @@ export class Container {
     this.providers.set(token, {
       scope,
       factory: () => {
-        const resolvedDeps = deps.map((depToken: any) =>
-          this.resolve(depToken),
-        );
+        const resolvedDeps = deps.map((depToken: any) => this.resolve(depToken));
         return new provider.useClass(...resolvedDeps);
       },
     });
   }
 
   resolve<T>(token: any): T {
-    const provider = this.providers.get(token);
+    let provider = this.providers.get(token);
+
+    // Support mixed runtime copies (e.g. framework src + app using framework dist)
+    // by matching class/function tokens by name as a fallback.
+    if (!provider && token && typeof token === "function" && token.name) {
+      for (const [registeredToken, registeredProvider] of this.providers.entries()) {
+        if (
+          registeredToken &&
+          typeof registeredToken === "function" &&
+          registeredToken.name === token.name
+        ) {
+          provider = registeredProvider;
+          break;
+        }
+      }
+    }
 
     if (!provider) {
       if (this.parent) {
