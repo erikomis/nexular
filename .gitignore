@@ -1,0 +1,82 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production
+.env*.local
+
+# Secrets & Security
+.vault/
+*.key
+*.pem
+*.p8
+*.p12
+*.pfx
+*.jks
+secrets/
+private/
+config/secrets.*.json
+nexular.runtime.json
+nexular.runtime.*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.iml
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+.mocha_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Misc
+*.bak
+tmp/
+temp/
+cache/
+
+# OS
+.DS_Store
+Thumbs.db
+*.sw?
+
+# Build artifacts
+!/dist/client/main.js
+dist/**/*.map
+.cache/
+
+# OS
+Thumbs.db
+.DS_Store
+*.exe
+*.dmg
